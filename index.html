@@ -1,0 +1,186 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Survival Shooter</title>
+  <style>
+    body { margin: 0; overflow: hidden; background: black; }
+    canvas { display: block; }
+  </style>
+</head>
+<body>
+<canvas id="game"></canvas>
+
+<script>
+const canvas = document.getElementById("game");
+const ctx = canvas.getContext("2d");
+
+canvas.width = window.innerWidth;
+canvas.height = window.innerHeight;
+
+// ================= PLAYER =================
+const player = {
+  x: canvas.width / 2,
+  y: canvas.height / 2,
+  size: 20,
+  speed: 4,
+  hp: 100
+};
+
+// ================= INPUT =================
+const keys = {};
+window.addEventListener("keydown", e => keys[e.key] = true);
+window.addEventListener("keyup", e => keys[e.key] = false);
+
+let mouse = { x: 0, y: 0 };
+window.addEventListener("mousemove", e => {
+  mouse.x = e.clientX;
+  mouse.y = e.clientY;
+});
+
+// ================= BULLETS =================
+let bullets = [];
+
+function shoot() {
+  const angle = Math.atan2(mouse.y - player.y, mouse.x - player.x);
+  bullets.push({
+    x: player.x,
+    y: player.y,
+    dx: Math.cos(angle) * 8,
+    dy: Math.sin(angle) * 8,
+    size: 5
+  });
+}
+
+window.addEventListener("click", shoot);
+
+// ================= ENEMIES =================
+let enemies = [];
+
+function spawnEnemy() {
+  const edge = Math.floor(Math.random() * 4);
+  let x, y;
+
+  if (edge === 0) { x = 0; y = Math.random() * canvas.height; }
+  if (edge === 1) { x = canvas.width; y = Math.random() * canvas.height; }
+  if (edge === 2) { x = Math.random() * canvas.width; y = 0; }
+  if (edge === 3) { x = Math.random() * canvas.width; y = canvas.height; }
+
+  enemies.push({
+    x, y,
+    size: 20,
+    speed: 1 + Math.random() * 1.5,
+    hp: 3
+  });
+}
+
+// ================= UTILS =================
+function dist(a, b) {
+  return Math.hypot(a.x - b.x, a.y - b.y);
+}
+
+// ================= GAME STATE =================
+let score = 0;
+let gameOver = false;
+
+// ================= UPDATE =================
+function update() {
+  if (gameOver) return;
+
+  // movement
+  if (keys["w"]) player.y -= player.speed;
+  if (keys["s"]) player.y += player.speed;
+  if (keys["a"]) player.x -= player.speed;
+  if (keys["d"]) player.x += player.speed;
+
+  // bullets
+  bullets.forEach(b => {
+    b.x += b.dx;
+    b.y += b.dy;
+  });
+
+  bullets = bullets.filter(b =>
+    b.x > 0 && b.x < canvas.width &&
+    b.y > 0 && b.y < canvas.height
+  );
+
+  // enemies move toward player
+  enemies.forEach(e => {
+    const angle = Math.atan2(player.y - e.y, player.x - e.x);
+    e.x += Math.cos(angle) * e.speed;
+    e.y += Math.sin(angle) * e.speed;
+
+    // damage player
+    if (dist(e, player) < e.size) {
+      player.hp -= 0.2;
+      if (player.hp <= 0) gameOver = true;
+    }
+  });
+
+  // bullet collision
+  enemies.forEach((e, ei) => {
+    bullets.forEach((b, bi) => {
+      if (dist(e, b) < e.size) {
+        e.hp--;
+        bullets.splice(bi, 1);
+        if (e.hp <= 0) {
+          enemies.splice(ei, 1);
+          score += 10;
+        }
+      }
+    });
+  });
+
+  // spawn enemies
+  if (Math.random() < 0.02) spawnEnemy();
+}
+
+// ================= DRAW =================
+function draw() {
+  ctx.fillStyle = "black";
+  ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+  // player
+  ctx.fillStyle = "cyan";
+  ctx.beginPath();
+  ctx.arc(player.x, player.y, player.size, 0, Math.PI * 2);
+  ctx.fill();
+
+  // bullets
+  ctx.fillStyle = "yellow";
+  bullets.forEach(b => {
+    ctx.beginPath();
+    ctx.arc(b.x, b.y, b.size, 0, Math.PI * 2);
+    ctx.fill();
+  });
+
+  // enemies
+  ctx.fillStyle = "red";
+  enemies.forEach(e => {
+    ctx.beginPath();
+    ctx.arc(e.x, e.y, e.size, 0, Math.PI * 2);
+    ctx.fill();
+  });
+
+  // UI
+  ctx.fillStyle = "white";
+  ctx.font = "20px Arial";
+  ctx.fillText("HP: " + Math.floor(player.hp), 20, 30);
+  ctx.fillText("Score: " + score, 20, 60);
+
+  if (gameOver) {
+    ctx.font = "50px Arial";
+    ctx.fillText("GAME OVER", canvas.width/2 - 150, canvas.height/2);
+  }
+}
+
+// ================= LOOP =================
+function loop() {
+  update();
+  draw();
+  requestAnimationFrame(loop);
+}
+
+loop();
+</script>
+</body>
+</html>
